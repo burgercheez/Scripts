@@ -305,7 +305,7 @@ end
 
 function LS:Notify(Config)
 	StarterGui:SetCore("SendNotification", {
-		Title = Config.Title or "LS-v0.1",
+		Title = Config.Title or "LS-v0.2",
 		Text = Config.Text or "",
 		Duration = Config.Duration or 5,
 	})
