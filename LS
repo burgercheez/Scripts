@@ -265,6 +265,13 @@ function LS:AntiCheatBypass()
 		end
 	end)
 
+	for _, track in pairs(LocalPlayer.Character.Humanoid:GetPlayingAnimationTracks()) do
+	    local anim = track.Animation
+	    if anim and anim.AnimationId == "rbxassetid://73126877562422" then
+	        track:Destroy()
+	    end
+	end
+
 	self:Notify({Text = "Bypassed anti-cheat."})
 end
 
