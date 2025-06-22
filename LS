@@ -5,9 +5,7 @@ if not getgenv().Config then
 		InfStamina = true,
 		SilentAim = true,
 
-		Whitelist = {
-			"Jacks0nMagicRift_YT","IsaacBlockGiga"
-		}
+		Whitelist = {}
 	}
 end
 
@@ -159,7 +157,7 @@ function LS:OnCharacterAdded()
 
 	end)
 
-	self:AntiCheatBypass()
+	--self:AntiCheatBypass()
 
 	for _, Func in pairs(self.CharacterAdded.Insts) do
 		Func()
@@ -240,6 +238,8 @@ function LS:SilentAim(inst, args)
 end
 
 function LS:AntiCheatBypass()
+
+	repeat task.wait() until LocalPlayer and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("")
 
 	self:GetGarbageCollection(false, function(inst)
 		if typeof(inst) == "function" and debug.getinfo(inst).name == "GetPlayerBanned" then
