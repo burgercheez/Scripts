@@ -4,7 +4,6 @@ if not getgenv().Config then
 
 		InfStamina = true,
 		SilentAim = true,
-		AdminBlock = true,
 
 		Whitelist = {
 			"Jacks0nMagicRift_YT","IsaacBlockGiga"
@@ -318,7 +317,7 @@ end
 
 function LS:Notify(Config)
 	StarterGui:SetCore("SendNotification", {
-		Title = Config.Title or "LS-v0.0",
+		Title = Config.Title or "LS-v0.1",
 		Text = Config.Text or "",
 		Duration = Config.Duration or 5,
 	})
