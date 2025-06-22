@@ -55,6 +55,7 @@ function LS.init()
 	self:SetValue("Main", self)
 
 	LocalPlayer.Character.Humanoid.Health = 0
+	LocalPlayer.Character:BreakJoints()
 	self:CallEvent("WeaponEvent", {"Reset"})
 	Main:Notify({Text = "Resetting on execution is required"})
 
