@@ -1,0 +1,357 @@
+if not getgenv().Config then
+	getgenv().Config = {
+		OnlyChangeConfig = false,
+
+		InfStamina = true,
+		SilentAim = true,
+		AdminBlock = true,
+
+		Whitelist = {
+			"Jacks0nMagicRift_YT","IsaacBlockGiga"
+		}
+	}
+end
+
+if getgenv().Config.OnlyChangeConfig then
+	return warn("Only changed config.")
+else
+	print("Loading script..")
+end
+
+if getgenv().IsRunning then
+	getgenv().IsRunning = false
+	if getgenv().Main then
+		getgenv().Main:Cleanup()
+	end
+end
+
+local LS = {
+	StartTime = os.clock(),
+
+	Insts = {
+		SilentAimTarget = nil,
+		EquippedTool = nil,
+	}
+}
+LS.__index = LS
+
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = workspace.CurrentCamera
+
+local Remotes = ReplicatedStorage.Events
+
+function LS.init()
+	
+	local self = setmetatable({}, LS)
+
+	self:OnCharacterAdded()
+	self:OnBackpackAdded()
+	self:HookMetamethod()
+	self:ClientRenderStep()
+
+	self:SetValue("IsRunning", true)
+	self:SetValue("Main", self)
+
+	--print(self:GetSilentAimTarget())
+
+	return self
+
+end
+
+function LS:ClientRenderStep()
+	self.RenderStep = {
+		Insts = {
+			GetSilentAimTarget = {
+				Enabled = self:FunctionConfig("SilentAim"),
+				Function = self.GetSilentAimTarget
+			},
+
+			GetEquippedTool = {
+				Enabled = function()
+					return true
+				end,
+				Function = self.GetEquippedTool
+			}
+		}
+	}
+
+	RunService:BindToRenderStep("Client", 250, function(dt)
+        for _, renderInst in pairs(self.RenderStep.Insts) do
+			--print(renderInst.Enabled)
+			--print(renderInst.Enabled())
+             if renderInst.Enabled() then
+                 renderInst.Function(self)
+             end
+         end
+	end)
+end
+
+function LS:FunctionConfig(name)
+	local FunctionConfig = function()
+		return self:GetConfig(name)
+	end
+	return FunctionConfig
+end
+
+function LS:GetConfig(name)
+	return getgenv().Config[name]
+end
+
+function LS:SetConfig(name, val)
+	getgenv().Config[name] = val
+end
+
+function LS:GetValue(name)
+	return getgenv()[name]
+end
+
+function LS:SetValue(name, val)
+	getgenv()[name] = val 
+end
+
+function LS:CallEvent(name, args)
+	local Remote = Remotes[name]
+	if Remote:IsA("RemoteEvent") then
+		Remote:FireServer(table.unpack(args))
+	elseif Remote:IsA("RemoteFunction") then
+		Remote:InvokeServer(table.unpack(args))
+	end
+end
+
+function LS:GetGarbageCollection(val, Condition)
+	for i,v in pairs(getgc(val)) do
+		if Condition then
+			local Return = Condition(v)
+			if Return then
+				return
+			end
+		end
+	end
+end
+
+function LS:GetEquippedTool()
+	local Tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool") or nil
+	self.Insts.EquippedTool = Tool
+end
+
+function LS:OnCharacterAdded()
+	self.CharacterAdded = {
+		Function = nil,
+		Insts = {}
+	}
+
+	self.CharacterAdded.Function = LocalPlayer.CharacterAdded:Connect(function(char)
+		
+		self:AntiCheatBypass()
+		self:OnBackpackAdded()
+
+		for _, Func in pairs(self.CharacterAdded.Insts) do
+			Func()
+		end
+
+	end)
+
+	self:AntiCheatBypass()
+
+	for _, Func in pairs(self.CharacterAdded.Insts) do
+		Func()
+	end
+end
+
+function LS:OnBackpackAdded()
+	self.BackpackAdded = {
+		Function = nil,
+		Insts = {}
+	}
+
+	self:InfStamina()
+	
+	self.BackpackAdded.Function = LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+		
+		for _, Func in pairs(self.BackpackAdded.Insts) do
+			Func(child)
+		end
+
+	end)
+
+	for _, Func in pairs(self.BackpackAdded.Insts) do
+		Func()
+	end
+end
+
+function LS:HookMetamethod()
+	self.HookMetamethod = {
+		Function = nil,
+		Insts = {
+			SilentAim = {
+				Enabled = self:FunctionConfig("SilentAim"),
+				Function = self.SilentAim
+			}
+		}
+	}
+
+	local oldMethod
+	oldMethod = hookmetamethod(game, "__namecall", function(inst, ...)
+		local Args = {...}
+		local NamecallMethod = getnamecallmethod()
+
+		if inst.Name == "ADMIN" then
+			return
+		end
+
+		if NamecallMethod == "FireServer" or NamecallMethod == "InvokeServer" then
+           for i, hookInst in pairs(self.HookMetamethod.Insts) do
+                if hookInst.Enabled() then
+                    Args = hookInst.Function(self, inst, Args) or Args
+                end
+            end
+        end
+		
+		return oldMethod(inst, unpack(Args))
+	end)
+
+	self.HookMetamethod.Function = oldMethod
+
+end
+
+function LS:SilentAim(inst, args)
+    if inst.Name == "WeaponEvent" and args[1] == "Fire" then
+        local isValid = typeof(args[2]) == "table" 
+                     and typeof(args[2][2]) == "table"
+                     and typeof(args[2][2][1]) == "Instance"
+        
+		local Target = self.Insts.SilentAimTarget
+        if isValid and Target then
+			args[2][2][1] = Target
+			args[2][2][2] = Target.Size
+			args[2][1] = (EquippedTool and EquippedTool:FindFirstChild("Muzzle") and EquippedTool.Muzzle.CFrame.p) or LocalPlayer.Character.PrimaryPart.Position
+			args[2][3] = (EquippedTool and EquippedTool:FindFirstChild("Muzzle") and EquippedTool.Muzzle.CFrame) or LocalPlayer.Character.PrimaryPart.CFrame
+        end
+    end
+    return args
+end
+
+function LS:AntiCheatBypass()
+
+	self:GetGarbageCollection(false, function(inst)
+		if typeof(inst) == "function" and debug.getinfo(inst).name == "GetPlayerBanned" then
+			hookfunction(inst, function()
+				return warn("I'm way too sigma for this ban!")
+			end)
+
+			return true
+		end
+	end)
+
+	if not LocalPlayer.Character:FindFirstChild("") or not LocalPlayer.Character:FindFirstChild(""):IsA("LocalScript") then
+		LocalPlayer.Character.Humanoid.Health = 0
+		self:CallEvent("WeaponEvent", {"Reset"})
+		return
+	end
+
+	local AntiCheat = LocalPlayer.Character[""]
+	AntiCheat.Disabled = true
+
+	task.spawn(function()
+		while true do
+			task.wait()
+			local succ, err = pcall(function()
+				local GetPlayerBanned = getsenv(AntiCheat).GetPlayerBanned
+				if GetPlayerBanned then
+					hookfunction(GetPlayerBanned, function()
+						return warn("I'm way too sigma for this ban!")
+					end)
+				end
+			end)
+
+			if succ then
+				break
+			end
+		end
+	end)
+
+	self:GetGarbageCollection(false, function(inst)
+		if typeof(inst) == "function" and debug.getinfo(inst).name == "GetPlayerBanned" then
+			hookfunction(inst, function()
+				return warn("I'm way too sigma for this ban!")
+			end)
+
+			return true
+		end
+	end)
+
+	self:Notify({Text = "Bypassed anti-cheat."})
+end
+
+function LS:InfStamina(child)
+	self.BackpackAdded.Insts["InfStamina"] = function()
+		local LocalScripts
+		if (child ~= nil and child.Name == "LocalScripts" and child) then
+			LocalScripts = child
+		elseif LocalPlayer.Backpack:FindFirstChild("LocalScripts") then
+			LocalScripts = LocalPlayer.Backpack.LocalScripts
+		end
+
+		if LocalScripts then
+
+			task.spawn(function()
+				while true do
+					task.wait()
+					local succ, err = pcall(function()
+						setupvalue(getsenv(LocalScripts.LocalMain).AddStamina, 1, math.huge)
+					end)
+
+					if succ then
+						break
+					end
+				end
+			end)
+
+		end
+	end
+end
+
+function LS:Notify(Config)
+	StarterGui:SetCore("SendNotification", {
+		Title = Config.Title or "LS-v0.0",
+		Text = Config.Text or "",
+		Duration = Config.Duration or 5,
+	})
+end
+
+function LS:GetSilentAimTarget()
+	local Closest = nil
+	local Distance = 1000
+	local MousePos = Vector2.new(Mouse.X, Mouse.Y)
+	for _, v in pairs(Players:GetPlayers()) do
+		local Char = v.Character
+		local Hum = Char and Char:FindFirstChild("Humanoid")
+		if v ~= LocalPlayer and not table.find(getgenv().Config.Whitelist, tostring(v)) and Hum and Hum.Health > 0 and Char:FindFirstChild("Head") and not Char:FindFirstChild("ForceField") then
+			local vector, onScreen = Camera:WorldToScreenPoint(Char.Head.Position)
+            if onScreen then
+                local NewDistance = (MousePos - Vector2.new(vector.X, vector.Y)).Magnitude
+                if NewDistance < Distance then
+                    Distance = NewDistance
+                    Closest = Char.Head
+                end
+            end
+		end
+	end
+
+	self.Insts.SilentAimTarget = Closest
+end
+
+function LS:Cleanup()
+	self.CharacterAdded.Function:Disconnect()
+	self.BackpackAdded.Function:Disconnect()
+	hookmetamethod(game, "__namecall", self.HookMetamethod.Function)
+	RunService:UnbindFromRenderStep("Client")
+end
+
+local Main = LS.init()
+Main:Notify({Text = "Loaded in "..os.clock()-Main.StartTime})
