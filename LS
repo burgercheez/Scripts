@@ -56,6 +56,10 @@ function LS.init()
 	self:SetValue("IsRunning", true)
 	self:SetValue("Main", self)
 
+	LocalPlayer.Character.Humanoid.Health = 0
+	self:CallEvent("WeaponEvent", {"Reset"})
+	Main:Notify({Text = "Resetting on execution is required"})
+
 	--print(self:GetSilentAimTarget())
 
 	return self
@@ -247,32 +251,8 @@ function LS:AntiCheatBypass()
 		end
 	end)
 
-	if not LocalPlayer.Character:FindFirstChild("") or not LocalPlayer.Character:FindFirstChild(""):IsA("LocalScript") then
-		LocalPlayer.Character.Humanoid.Health = 0
-		self:CallEvent("WeaponEvent", {"Reset"})
-		return
-	end
-
 	local AntiCheat = LocalPlayer.Character[""]
 	AntiCheat.Disabled = true
-
-	task.spawn(function()
-		while true do
-			task.wait()
-			local succ, err = pcall(function()
-				local GetPlayerBanned = getsenv(AntiCheat).GetPlayerBanned
-				if GetPlayerBanned then
-					hookfunction(GetPlayerBanned, function()
-						return warn("I'm way too sigma for this ban!")
-					end)
-				end
-			end)
-
-			if succ then
-				break
-			end
-		end
-	end)
 
 	self:GetGarbageCollection(false, function(inst)
 		if typeof(inst) == "function" and debug.getinfo(inst).name == "GetPlayerBanned" then
