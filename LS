@@ -35,6 +35,7 @@ LS.__index = LS
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChat = game:GetService("TextChatService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
@@ -46,6 +47,7 @@ function LS.init()
 	
 	local self = setmetatable({}, LS)
 
+	self:OnChatted()
 	self:OnCharacterAdded()
 	self:OnBackpackAdded()
 	self:HookMetamethod()
@@ -55,7 +57,7 @@ function LS.init()
 	self:SetValue("Main", self)
 
 	LocalPlayer.Character.Humanoid.Health = 0
-	LocalPlayer.Character:BreakJoints()
+	--LocalPlayer.Character:BreakJoints()
 	self:CallEvent("WeaponEvent", {"Reset"})
 	Main:Notify({Text = "Resetting on execution is required"})
 
@@ -141,6 +143,28 @@ function LS:GetEquippedTool()
 	self.Insts.EquippedTool = Tool
 end
 
+function LS:OnChatted()
+	self.OnChatted = {
+		Function = nil,
+		Insts = {
+			self.Chat_Escape,
+			self.Chat_Reset
+		}
+	}
+
+	self.OnChatted.Function = TextChat.SendingMessage:Connect(function(msg)
+		local args = string.split(msg.Text, " ")
+		print(args[2])
+		if args[1] == "!" then
+			msg:Destroy()
+			for _, Func in pairs(self.OnChatted.Insts) do
+				print(_, Func)
+				Func(self, args, msg)
+			end
+		end
+	end)
+end
+
 function LS:OnCharacterAdded()
 	self.CharacterAdded = {
 		Function = nil,
@@ -219,6 +243,25 @@ function LS:HookMetamethod()
 
 	self.HookMetamethod.Function = oldMethod
 
+end
+
+function LS:Chat_Escape(args)
+	if args[2] == "escape" then
+		self:Touch(workspace.Ignore.EscapedWall.EscapeWall, LocalPlayer.Character.HumanoidRootPart)
+		Main:Notify({Text = "Attempted escape."})
+	end
+end
+
+function LS:Chat_Reset(args)
+	if args[2] == "reset" then
+		self:CallEvent("WeaponEvent", {"Reset"})
+		Main:Notify({Text = "Attempted reset."})
+	end
+end
+
+function LS:Touch(Target, Base)
+	firetouchinterest(Target, Base, 0)
+	firetouchinterest(Target, Base, 1)
 end
 
 function LS:SilentAim(inst, args)
@@ -307,22 +350,26 @@ function LS:Notify(Config)
 	StarterGui:SetCore("SendNotification", {
 		Title = Config.Title or "LS-v0.2",
 		Text = Config.Text or "",
-		Duration = Config.Duration or 5,
+		Duration = Config.Duration or 3,
 	})
 end
 
 function LS:GetSilentAimTarget()
 	local Closest = nil
-	local Distance = 1000
+	local Distance = math.huge
 	local MousePos = Vector2.new(Mouse.X, Mouse.Y)
 	for _, v in pairs(Players:GetPlayers()) do
 		local Char = v.Character
 		local Hum = Char and Char:FindFirstChild("Humanoid")
 		if v ~= LocalPlayer and not table.find(getgenv().Config.Whitelist, tostring(v)) and Hum and Hum.Health > 0 and Char:FindFirstChild("Head") and not Char:FindFirstChild("ForceField") then
-			local vector, onScreen = Camera:WorldToScreenPoint(Char.Head.Position)
-            if onScreen then
-                local NewDistance = (MousePos - Vector2.new(vector.X, vector.Y)).Magnitude
-                if NewDistance < Distance then
+			local screenPos, onScreen = Camera:WorldToViewportPoint(Char.Head.Position)
+
+			if onScreen then
+               -- local NewDistance = (MousePos - Vector2.new(vector.X, vector.Y)).Magnitude
+                local targetPos = Vector2.new(screenPos.X, screenPos.Y)
+				local NewDistance = (MousePos - targetPos).Magnitude
+				
+				if NewDistance < Distance then
                     Distance = NewDistance
                     Closest = Char.Head
                 end
@@ -334,10 +381,13 @@ function LS:GetSilentAimTarget()
 end
 
 function LS:Cleanup()
-	self.CharacterAdded.Function:Disconnect()
-	self.BackpackAdded.Function:Disconnect()
-	hookmetamethod(game, "__namecall", self.HookMetamethod.Function)
-	RunService:UnbindFromRenderStep("Client")
+	pcall(function()
+		self.OnChatted.Function:Disconnect()
+		self.CharacterAdded.Function:Disconnect()
+		self.BackpackAdded.Function:Disconnect()
+		hookmetamethod(game, "__namecall", self.HookMetamethod.Function)
+		RunService:UnbindFromRenderStep("Client")
+	end)
 end
 
 local Main = LS.init()
